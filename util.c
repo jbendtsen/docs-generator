@@ -74,7 +74,7 @@ void vector_append_utf8_html(Vector *vec, const char *str, int len)
 		out = vector_add(vec, 1, to_copy);
 
 		char *op = out;
-		while (op - out < to_copy) {
+		while (op - out < prev_copy) {
 			if (esc_left > 0) {
 				if (esc_left == 6) *op++ = '&';
 				else if (esc_left == 5) *op++ = '#';
@@ -104,10 +104,10 @@ void vector_append_utf8_html(Vector *vec, const char *str, int len)
 			}
 			else {
 				utf8_left = 0;
-				if (c < ' ' || c > '~' || c == '&' || c == '<' || c == '>' || c == '"') {
+				if ((c < ' ' && c != '\n' && c != '\t') || c > '~' || c == '&' || c == '<' || c == '>' || c == '"') {
 					esc_c = *ip++;
 					esc_left = 6;
-					to_copy += esc_left;
+					to_copy += esc_left - 1;
 				}
 				else {
 					*op++ = *ip++;

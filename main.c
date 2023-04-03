@@ -143,6 +143,7 @@ int main(int argc, char **argv)
 		Source source = {0};
 		source.file = read_whole_file(fname);
 		source.sort_order = sort_order;
+		source.access_level = DOC_ACCESS_PRIVATE;
 		*(Source*)vector_add(&source_list, sizeof(Source), 1) = source;
 
 		if (!source.file.buf) {

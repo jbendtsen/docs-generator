@@ -72,10 +72,55 @@ void print_docs(Source *source, const char *output_root)
     }
 }
 
+void sort_source_docs(Source *source)
+{
+	
+}
+
+void maybe_write_text(Vector *html, const char *in, int start, int end)
+{
+	if (start >= 0 && end >= start)
+		vector_append_utf8_html(html, &in[start], end - start + 1);
+}
+
+void emit_summary(Vector *html, Source *source, const char *title, unsigned int mask)
+{
+	vector_append_cstring(html, "<h2>");
+	vector_append_utf8_html(html, title, strlen(title));
+	vector_append_cstring(html, "</h2><ul>");
+
+	const char *in = source->file.buf;
+	const Doc *d = (Doc*)source->docs.buf;
+	const Span *descs = (Span*)source->descs.buf;
+	int n_docs = source->docs.n;
+
+	for (int i = 0; d && i < n_docs; i++) {
+		if (d->flags & mask) {
+			vector_append_cstring(html, "<li><a href=\"");
+			// write link
+			vector_append_cstring(html, "\">");
+			maybe_write_text(html, in, d->main.code_start, d->main.code_end);
+			vector_append_cstring(html, "</a></li>");
+
+			if (d->first_desc_line >= 0) {
+				const Span *first = &descs[d->first_desc_line];
+				if (first->start >= 0 && first->end >= first->start) {
+					vector_append_cstring(html, "<ul><li>");
+					vector_append_utf8_html(html, &in[first->start], first->end - first->start + 1);
+					vector_append_cstring(html, "</li></ul>");
+				}
+			}
+		}
+		d++;
+	}
+
+	vector_append_cstring(html, "</ul>");
+}
+
 File generate_html(Source *source, File *css, int should_embed_css)
 {
 	Vector html = {0};
-	char *in = source->file.buf;
+	const char *in = source->file.buf;
 	
 	const char *class_name = NULL;
 	int class_name_len = 0;
@@ -118,9 +163,46 @@ File generate_html(Source *source, File *css, int should_embed_css)
 	Doc *d = source->docs.buf;
 	int n_docs = source->docs.n;
 
+	vector_append_cstring(&html, "<table><tbody>");
+
 	for (int i = 0; d && i < n_docs; i++) {
-		
+		if (d->flags & DOC_FLAG_IS_PARENT) {
+			vector_append_cstring(&html, "<tr><td>");
+			if (d->flags & DOC_FLAG_FINAL)
+				vector_append_cstring(&html, "final ");
+			if (d->flags & DOC_FLAG_STATIC)
+				vector_append_cstring(&html, "static ");
+			if (d->flags & DOC_FLAG_ABSTRACT)
+				vector_append_cstring(&html, "abstract ");
+
+			if (d->flags & DOC_FLAG_CLASS)
+				vector_append_cstring(&html, "class");
+			else if (d->flags & DOC_FLAG_STRUCT)
+				vector_append_cstring(&html, "struct");
+			else if (d->flags & DOC_FLAG_EXTENSION)
+				vector_append_cstring(&html, "extension");
+			else if (d->flags & DOC_FLAG_INTERFACE)
+				vector_append_cstring(&html, "interface");
+
+			vector_append_cstring(&html, "</td><td>");
+			if (d->name.start >= 0 && d->name.end >= d->name.start) {
+				// write parent names here, eg. ParentClass.SubParent.
+				vector_append_utf8_html(&html, &in[d->name.start], d->name.end - d->name.start + 1);
+			}
+
+			vector_append_cstring(&html, "</td><td>");
+			maybe_write_text(&html, in, d->main.cmt_start, d->main.cmt_end);
+
+			vector_append_cstring(&html, "</td></tr>");
+		}
+		d++;
 	}
+
+	vector_append_cstring(&html, "</tbody></table>");
+
+	emit_summary(&html, source, "Constructors", DOC_FLAG_CTOR);
+	emit_summary(&html, source, "Methods", DOC_FLAG_METHOD);
+	emit_summary(&html, source, "Fields", DOC_FLAG_FIELD);
 
 	vector_append_cstring(&html, "</body></html>\n");
 
